@@ -25,13 +25,19 @@ app.use('/api/courses', require('./routes/courses'));
 app.use('/api/learn', require('./routes/learn'));
 app.use('/', require('./routes/certificates')); // /c/:code and /api/certificates/:code
 
+// Whether demo data is present, resolved once after seeding rather than per
+// request. The host polls this endpoint as a liveness check, so it must not
+// touch the database — a slow or locked read here reads as a dead instance and
+// gets the container pulled out of rotation.
+let demoSeeded = false;
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     ai_configured: Boolean(process.env.ANTHROPIC_API_KEY),
     model: process.env.ANTHROPIC_MODEL || 'claude-opus-5',
     // Lets the landing page offer one-click demo sign-in only when seeded.
-    demo: Boolean(db.prepare(`SELECT 1 FROM users WHERE email = 'learner@demo.test'`).get()),
+    demo: demoSeeded,
   });
 });
 
@@ -82,6 +88,8 @@ if (process.env.SEED_DEMO === 'true') {
     console.error('[seed] Demo seed failed:', err.message);
   }
 }
+
+demoSeeded = Boolean(db.prepare(`SELECT 1 FROM users WHERE email = 'learner@demo.test'`).get());
 
 const reaped = jobs.reapStaleJobs();
 if (reaped > 0) console.log(`[jobs] Marked ${reaped} interrupted job(s) as failed.`);
