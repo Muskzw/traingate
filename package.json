@@ -1,0 +1,26 @@
+{
+  "name": "traingate",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Corporate training platform: upload a deck, AI splits it into sections, generates gated quizzes, issues completion certificates.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "better-sqlite3": "^11.10.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jszip": "^3.10.1",
+    "multer": "^2.2.0"
+  },
+  "optionalDependencies": {
+    "pdf-parse": "^1.1.1"
+  }
+}
