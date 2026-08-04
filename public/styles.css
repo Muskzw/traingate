@@ -48,10 +48,15 @@
 
 * { box-sizing: border-box; }
 
+/* Buttons and .button set display, which would otherwise beat the attribute. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  /* Certificate IDs and long unbroken strings must not widen the page. */
+  overflow-wrap: break-word;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 15px;
   line-height: 1.6;
@@ -100,6 +105,19 @@ p:last-child { margin-bottom: 0; }
 .page-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
 .page-head .grow { flex: 1; min-width: 240px; }
 .page-head p { color: var(--text-dim); margin: 0; }
+
+/* Content + sidebar. These must stay in the stylesheet rather than inline on
+   the element: an inline grid-template-columns cannot be overridden by the
+   media query below, which is what kept these two-column on phones. */
+.split, .split-wide { display: grid; gap: 16px; align-items: start; }
+.split { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+.split-wide { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
+.split-aside { position: sticky; top: 80px; }
+
+@media (max-width: 900px) {
+  .split, .split-wide { grid-template-columns: minmax(0, 1fr); }
+  .split-aside { position: static; }
+}
 
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -200,13 +218,18 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
   padding: 14px 16px; border-radius: var(--radius);
   border: 1px solid var(--border); background: var(--bg-raised);
   text-align: left; width: 100%; cursor: pointer;
+  /* These are <button>s, which the control rules set to nowrap — section
+     titles are full sentences and must be allowed to wrap. */
+  white-space: normal;
 }
 .sectionitem:hover:not(:disabled) { border-color: var(--accent); }
 .sectionitem:disabled { cursor: not-allowed; opacity: .55; }
 .sectionitem.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .sectionitem .grow { flex: 1; min-width: 0; }
-.sectionitem .t { font-weight: 600; }
-.sectionitem .s { font-size: 13px; color: var(--text-faint); }
+/* Both are spans, so they need to be told to stack — otherwise the title and
+   its status run together on one line. */
+.sectionitem .t { display: block; font-weight: 600; overflow-wrap: anywhere; }
+.sectionitem .s { display: block; font-size: 13px; color: var(--text-faint); }
 .stepdot {
   width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center;
   font-size: 13px; font-weight: 700; background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text-dim);
@@ -303,7 +326,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
 .lp-hero h1 {
   font-size: clamp(30px, 5.2vw, 46px);
   letter-spacing: -.025em; line-height: 1.15;
-  max-width: 18ch; margin: 18px auto .55em;
+  max-width: 24ch; margin: 18px auto .55em;
   /* Falls back to the plain text colour where background-clip is unsupported. */
   background: linear-gradient(135deg, var(--text) 30%, var(--accent));
   -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -325,9 +348,38 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent);
 }
 
+.lp-feature { transition: transform .18s ease, border-color .18s ease; }
+.lp-feature:hover { transform: translateY(-3px); border-color: var(--border-strong); }
 .lp-feature h3 { margin: 10px 0 6px; font-size: 15.5px; }
 .lp-feature p { font-size: 14.5px; }
 .lp-icon { font-size: 22px; line-height: 1; }
+
+/* -------------------------------------------------- interactive gate demo */
+
+.lp-try-grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+.lp-try .option { transition: border-color .15s, background .15s; }
+.lp-try-gate .sectionitem { cursor: default; }
+.lp-try-gate .sectionitem[data-state="locked"] { opacity: .55; }
+.lp-try-gate .sectionitem[data-state="open"] { opacity: 1; border-color: var(--accent); }
+
+.just-unlocked { animation: unlock .45s ease; }
+@keyframes unlock {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  45%  { transform: scale(1.02); box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 transparent; }
+}
+
+.shake { animation: shake .4s ease; }
+@keyframes shake {
+  10%, 90% { transform: translateX(-2px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+
+/* Scroll reveal. Only ever added by JS, so no-JS still shows everything. */
+.reveal { opacity: 0; transform: translateY(14px); transition: opacity .5s ease, transform .5s ease; }
+.reveal.shown { opacity: 1; transform: none; }
 
 .lp-final { text-align: center; padding: 40px 24px; }
 .lp-final h2 { margin-bottom: .35em; }
@@ -339,13 +391,49 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); 
   font-size: 13px; color: var(--text-dim);
 }
 
+@media (max-width: 860px) {
+  .lp-try-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
 @media (max-width: 700px) {
-  .topbar { height: auto; padding: 10px 16px; flex-wrap: wrap; }
+  /* The topbar becomes two rows: brand + account on top, nav scrolling below. */
+  .topbar {
+    height: auto; padding: 10px 14px; gap: 10px;
+    flex-wrap: wrap; align-items: center;
+  }
+  .brand { order: 1; }
+  .topbar-right { order: 2; margin-left: auto; gap: 8px; }
+  .nav {
+    order: 3; margin-left: 0; width: 100%;
+    flex-wrap: nowrap; overflow-x: auto; gap: 2px;
+    scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav a { white-space: nowrap; }
+
   .page { padding: 20px 16px 80px; }
   .whoami { display: none; }
+
   .landing { padding: 0 16px 64px; }
-  .lp-hero { padding: 44px 0 40px; }
+  .lp-hero { padding: 40px 0 36px; }
+  .lp-hero h1 { max-width: none; }
   .lp-cta .button, .lp-cta button { width: 100%; justify-content: center; }
+  .lp-section { padding: 34px 0; }
+
+  /* Full-width tap targets read better than centred pills on a phone. */
+  .gatebar { flex-direction: column; align-items: stretch; }
+  .gatebar button, .gatebar .button { width: 100%; justify-content: center; }
+  .modal { padding: 18px; }
+  .scorehero .n { font-size: 44px; }
+  h1 { font-size: 22px; }
+}
+
+/* Stop long words and IDs forcing horizontal page scroll on narrow screens. */
+@media (max-width: 480px) {
+  .card { padding: 16px; }
+  .qprompt { font-size: 15px; }
+  .option { padding: 10px 12px; font-size: 14px; }
+  .stat-value { font-size: 23px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

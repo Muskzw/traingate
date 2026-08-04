@@ -240,6 +240,21 @@ const HOW = [
   ['Everyone gets a verifiable certificate', 'Issued with an ID anyone — an auditor, a client, a regulator — can check on a public page.'],
 ];
 
+/** A real question from the demo course, playable before signing up. */
+const TRY_Q = {
+  prompt:
+    'A colleague says the AI assistant "looked up" your company holiday policy and got it wrong. What is the most accurate explanation?',
+  options: [
+    'It predicted plausible policy text rather than retrieving your actual policy',
+    'It retrieved the policy but the file was out of date',
+    "It searched the internet and found another company's policy",
+    'The model was temporarily offline',
+  ],
+  correct: 0,
+  explanation:
+    'Unless it has been given a tool or your actual document, the model generates text that resembles a policy. It is not retrieving anything.',
+};
+
 const WHY = [
   ['📄', 'Your material, not generic content', 'Courses are built from the deck you upload, so the wording, policies and examples are yours.'],
   ['🔒', 'Real completion evidence', 'Time on section is tracked and quizzes must be passed. "I watched it" stops being the standard.'],
@@ -267,6 +282,54 @@ async function viewLanding() {
         ${health.demo ? `<button id="lp-demo">Take a tour with demo data</button>` : `<a class="button" href="#/signin">Sign in</a>`}
       </div>
       ${health.demo ? `<p class="faint" style="margin-top:14px">Signs you in as a demo learner with a course already assigned. Nothing to set up.</p>` : ''}
+    </section>
+
+    <section class="lp-section lp-try" id="try">
+      <h2 class="lp-h2">Try the gate</h2>
+      <div class="lp-try-grid">
+        <div class="card stack">
+          <p class="faint" style="margin:0">Question 1 of 3 · Section 1</p>
+          <p class="qprompt" style="margin:0">${esc(TRY_Q.prompt)}</p>
+          <div class="options" id="try-options">
+            ${TRY_Q.options
+              .map(
+                (o, i) => `
+              <label class="option" data-i="${i}">
+                <input type="radio" name="try" value="${i}">
+                <span>${esc(o)}</span>
+              </label>`
+              )
+              .join('')}
+          </div>
+          <div id="try-feedback"></div>
+          <div class="row">
+            <button class="primary" id="try-check" disabled>Check answer</button>
+            <button class="ghost" id="try-reset" hidden>Try again</button>
+          </div>
+        </div>
+
+        <div class="card stack lp-try-gate" id="try-gate">
+          <p class="lp-h2" style="margin:0">What the learner sees</p>
+          <div class="sectionlist">
+            <div class="sectionitem" data-state="open">
+              <span class="stepdot current" id="try-s1-dot">1</span>
+              <span class="grow"><span class="t">What these tools actually are</span>
+                <span class="s" id="try-s1">In progress</span></span>
+            </div>
+            <div class="sectionitem" id="try-s2" data-state="locked">
+              <span class="stepdot" id="try-s2-dot">🔒</span>
+              <span class="grow"><span class="t">Where these tools help, and where they hurt</span>
+                <span class="s" id="try-s2-label">Locked</span></span>
+            </div>
+            <div class="sectionitem" data-state="locked">
+              <span class="stepdot">🔒</span>
+              <span class="grow"><span class="t">The rules you are expected to follow</span>
+                <span class="s">Locked</span></span>
+            </div>
+          </div>
+          <p class="faint" style="margin:0">No skipping, no scrubbing to the end. This is the whole idea.</p>
+        </div>
+      </div>
     </section>
 
     <section class="lp-section">
@@ -313,6 +376,9 @@ async function viewLanding() {
     { chrome: false }
   );
 
+  wireTryGate();
+  revealOnScroll();
+
   document.getElementById('lp-demo')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     e.target.textContent = 'Signing in…';
@@ -332,6 +398,94 @@ async function viewLanding() {
       e.target.textContent = 'Take a tour with demo data';
     }
   });
+}
+
+/** The playable question on the landing page, and the gate it controls. */
+function wireTryGate() {
+  const opts = document.getElementById('try-options');
+  if (!opts) return;
+
+  const check = document.getElementById('try-check');
+  const reset = document.getElementById('try-reset');
+  const feedback = document.getElementById('try-feedback');
+  const s2 = document.getElementById('try-s2');
+
+  opts.addEventListener('change', () => { check.disabled = false; });
+
+  check.addEventListener('click', () => {
+    const picked = opts.querySelector('input:checked');
+    if (!picked) return;
+    const i = Number(picked.value);
+    const right = i === TRY_Q.correct;
+
+    opts.querySelectorAll('.option').forEach((el) => {
+      const n = Number(el.dataset.i);
+      if (n === TRY_Q.correct && right) el.classList.add('correct');
+      if (n === i && !right) el.classList.add('wrong');
+      el.querySelector('input').disabled = true;
+    });
+
+    check.hidden = true;
+    reset.hidden = false;
+
+    if (right) {
+      feedback.innerHTML = `<div class="notice good"><strong>Correct.</strong> ${esc(TRY_Q.explanation)}</div>`;
+      document.getElementById('try-s1').textContent = 'Passed · 100%';
+      document.getElementById('try-s1-dot').textContent = '✓';
+      document.getElementById('try-s1-dot').className = 'stepdot done';
+      document.getElementById('try-s2-dot').textContent = '2';
+      document.getElementById('try-s2-dot').className = 'stepdot current';
+      document.getElementById('try-s2-label').textContent = 'Unlocked — ready to read';
+      s2.dataset.state = 'open';
+      s2.classList.add('just-unlocked');
+    } else {
+      feedback.innerHTML = `<div class="notice bad"><strong>Not quite — so the gate holds.</strong> In a real course you would retry until you pass. Nobody moves on by clicking through.</div>`;
+      s2.classList.remove('shake');
+      void s2.offsetWidth; // restart the animation
+      s2.classList.add('shake');
+    }
+  });
+
+  reset.addEventListener('click', () => {
+    opts.querySelectorAll('.option').forEach((el) => {
+      el.classList.remove('correct', 'wrong');
+      const input = el.querySelector('input');
+      input.disabled = false;
+      input.checked = false;
+    });
+    feedback.innerHTML = '';
+    check.hidden = false;
+    check.disabled = true;
+    reset.hidden = true;
+    document.getElementById('try-s1').textContent = 'In progress';
+    document.getElementById('try-s1-dot').textContent = '1';
+    document.getElementById('try-s1-dot').className = 'stepdot current';
+    document.getElementById('try-s2-dot').textContent = '🔒';
+    document.getElementById('try-s2-dot').className = 'stepdot';
+    document.getElementById('try-s2-label').textContent = 'Locked';
+    s2.dataset.state = 'locked';
+    s2.classList.remove('just-unlocked', 'shake');
+  });
+}
+
+/** Fades sections in as they enter the viewport. No-ops if unsupported. */
+function revealOnScroll() {
+  const targets = document.querySelectorAll('.lp-section, .lp-final');
+  if (!('IntersectionObserver' in window) || !targets.length) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  targets.forEach((el) => el.classList.add('reveal'));
+  const io = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((e) => {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('shown');
+        io.unobserve(e.target);
+      });
+    },
+    { rootMargin: '0px 0px -10% 0px' }
+  );
+  targets.forEach((el) => io.observe(el));
 }
 
 /* ================================================================ auth */
@@ -759,7 +913,7 @@ async function viewCourseEditor(id) {
 
     ${c.status === 'failed' ? `<div class="notice bad" style="margin-bottom:20px">The last generation failed. Fix the source file or try again with <em>Regenerate</em>.</div>` : ''}
 
-    <div class="grid" style="grid-template-columns:minmax(0,2fr) minmax(280px,1fr);align-items:start">
+    <div class="split-wide">
       <div class="stack">
         ${data.sections
           .map(
@@ -1480,7 +1634,7 @@ function renderPlayer() {
   const pct = s.sections.length ? Math.round((passed / s.sections.length) * 100) : 0;
 
   const sidebar = `
-    <div class="stack" style="position:sticky;top:80px">
+    <div class="stack split-aside">
       <div class="card stack">
         <div>
           <div class="bar ${s.complete ? 'good' : ''}"><span style="width:${pct}%"></span></div>
@@ -1542,7 +1696,7 @@ function renderPlayer() {
       </div>
       ${s.complete ? '<span class="badge good">Complete</span>' : ''}
     </div>
-    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(280px,340px);align-items:start">
+    <div class="split">
       <div id="player-main">${main}</div>
       ${sidebar}
     </div>
